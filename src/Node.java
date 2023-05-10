@@ -4,7 +4,7 @@ public class Node {
     Node zero = null;
     Node one = null;
     int size = 0;
-    int depth = 0;
+    int depth = 1;
     boolean original;
 
     public Node(String value) {
@@ -13,6 +13,12 @@ public class Node {
 
     public Node(String value, Node parent) {
         this.value = value;
+        this.parent = parent;
+    }
+
+    public Node(String value, int depth, Node parent) {
+        this.value = value;
+        this.depth = depth;
         this.parent = parent;
     }
 

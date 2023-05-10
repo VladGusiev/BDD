@@ -1,14 +1,12 @@
-import java.io.CharConversionException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Objects;
 
 public class BDD {
     Node root;
-    int valuesAmount;
+    int valuesAmount = 0;
     int nodesAmount = 0;
+    int nodesReduced = 0;
+    int layersAmount = 0;
     String inputFunction;
     String inputOrder;
     String zeroPart;
@@ -20,29 +18,108 @@ public class BDD {
         this.inputFunction = bFunction;
         this.inputOrder = order;
 
-        this.root = bdd_create_rec(bFunction, order, 0);
+        this.root = bdd_create_rec(bFunction, order, 0, null);
         this.root.value = inputFunction;
 
     }
 
-    Node bdd_create_rec(String bFunction, String order, int iteration) {
+    Node bdd_create_rec(String bFunction, String order, int iteration, Node parentNode) {
         if(iteration >= order.length()) return null;
-        Node newNode = new Node(bFunction);
+
+        this.layersAmount++;
+
+        Node newNode = new Node(bFunction, iteration + 1, parentNode);
 
         this.shannonDecomposition(bFunction, String.valueOf(order.charAt(iteration)));
 
-        Node zeroNode = new Node(zeroPart, newNode);
-        Node oneNode = new Node(onePart, newNode);
+        Node zeroNode = new Node(zeroPart, iteration+1, newNode);
+        zeroNode.depth = newNode.depth + 1;
+        Node oneNode = new Node(onePart, iteration+1, newNode);
+        oneNode.depth = newNode.depth + 1;
+
         newNode.zero = zeroNode;
         newNode.one = oneNode;
 
-        newNode.zero = bdd_create_rec(newNode.zero.value, order, iteration+1);
 
-        newNode.one = bdd_create_rec(newNode.one.value, order, iteration + 1);
+        newNode.zero = bdd_create_rec(newNode.zero.value, order, iteration+1, newNode);
 
+        newNode.one = bdd_create_rec(newNode.one.value, order, iteration + 1, newNode);
+
+
+        this.nodesAmount += 1;
         return newNode;
+
     }
-//
+
+    void reduce(int depth) {
+
+
+        // --- REDUCTION ---
+        for(int k = 1; k <= depth; k++) {
+            ArrayList<Node> nodesList = getNodesByDepth(this.root, k);
+
+            //      Type I reduction
+            for (int i = 0; i < nodesList.size(); i++) {
+                if(nodesList.get(i).parent == null) continue;
+                for (int j = i+1; j < nodesList.size(); j++) {
+                    if (nodesList.get(i) == nodesList.get(j)) continue;
+                    if (nodesList.get(i).value.equals(nodesList.get(j).value)) {
+
+                        System.out.println("Type I Reduction was made! ");
+
+                        if (nodesList.get(j).parent.zero.value.equals(nodesList.get(j).value)) {
+
+                            nodesList.get(j).parent.zero = nodesList.get(i);
+
+                        } else if (nodesList.get(j).parent.one.value.equals(nodesList.get(j).value)) {
+//                            System.out.println("parent one was changed!");
+                            nodesList.get(j).parent.one = nodesList.get(i);
+
+                        }
+                        this.nodesReduced++;
+                    }
+                }
+            }
+
+            for(Node node : nodesList) {
+                //null checkers
+                if (node == null) return;
+//          Type S reduction
+                if (node.zero == null || node.one == null) continue;
+                if (node.zero.value.equals(node.one.value)) {
+                    System.out.println("Type S reduction was made");
+                    if (node.parent.zero.value.equals(node.value)) {
+                        node.parent.zero = node.zero;
+                    } else {
+                        node.parent.one = node.zero;
+                    }
+                    this.nodesReduced += 2;
+                }
+            }
+        }
+
+    }
+
+    ArrayList<Node> getNodesByDepth(Node root, int depth) {
+        ArrayList<Node> nodes = new ArrayList<>();
+        if (root == null) return nodes;
+
+        if (root.depth == depth) {
+            nodes.add(root);
+        } else {
+            nodes.addAll(getNodesByDepth(root.zero, depth));
+            nodes.addAll(getNodesByDepth(root.one, depth));
+        }
+       return nodes;
+    }
+
+    private ArrayList<Node> removedDuplicates(ArrayList<Node> nodes) {
+        ArrayList<Node> newNodes = new ArrayList<>();
+        for (Node thisNode : nodes) {
+            if (!newNodes.contains(thisNode)) newNodes.add(thisNode);
+        }
+        return newNodes;
+    }
 //    void reduce() {
 //
 //    }
@@ -59,33 +136,22 @@ public class BDD {
         if(dnf.contains("1")) {
             zeroPart = "1";
             onePart = "1";
-
-//            System.out.println("1");
-//            System.out.println("----");
             return;
         } else if (dnf.contains("0")) {
             zeroPart = "0";
             onePart = "0";
-//            System.out.println("0");
-//            System.out.println("----");
 
             return;
         }
         if(dnf.equals(var)) {
             onePart = "1";
             zeroPart = "0";
-//            System.out.println("One Part: 1");
-//            System.out.println("Zero Part: 0");
-//            System.out.println("----");
 
             return;
         }
         if(dnf.equals("!"+var)) {
             onePart = "0";
             zeroPart = "1";
-//            System.out.println("One Part: 0");
-//            System.out.println("Zero Part: 1");
-//            System.out.println("----");
             return;
         }
 
@@ -121,21 +187,12 @@ public class BDD {
         if (zeroTerms.equals("")) {
             zeroPart = "0";
             onePart = oneTerms.substring(0, oneTerms.length() - 1);
-//            System.out.println("One Term: "  + oneTerms.substring(0, oneTerms.length() - 1) + "\nZero Term: 0");
-//            System.out.println("----");
-
         } else if (oneTerms.equals("")) {
             zeroPart = zeroTerms.substring(0, zeroTerms.length() - 1);
             onePart = "0";
-//            System.out.println("Zero Term: " + zeroTerms.substring(0, zeroTerms.length() - 1) + "\nOne Term: 0");
-//            System.out.println("----");
-
         } else {
             zeroPart = zeroTerms.substring(0, zeroTerms.length() - 1);
             onePart = oneTerms.substring(0, oneTerms.length() - 1);
-//            System.out.println("Zero Part: " + (zeroTerms.substring(0, zeroTerms.length() - 1)) + " \nOne Part: " + (oneTerms.substring(0, oneTerms.length() - 1)));
-//            System.out.println("----");
-
         }
 
     }
@@ -155,6 +212,27 @@ public class BDD {
 
     }
 
+    public String reductionRate() {
+        float v = (float) nodesReduced / nodesAmount * 100.0f;
+        return String.format("Reduction rate on this BDD: %.2f %%", v);
+    }
+
+
+    void printInorder(Node node)
+    {
+        if (node == null)
+
+            return;
+
+        /* first recur on left child */
+        printInorder(node.zero);
+
+        /* then print the data of node */
+        System.out.print(node.value + " ");
+
+        /* now recur on right child */
+        printInorder(node.one);
+    }
 
     void print2DUtil(Node root, int space)
     {
@@ -181,10 +259,38 @@ public class BDD {
 
     public static void main(String[] args) {
         BDD bdd = new BDD();
-        bdd.bdd_create("A!B!C+ABC+!AB!C+!A!BC", "ABC");
+        bdd.bdd_create("AB+AC+BC", "ABC");
+
+        bdd.reduce(bdd.layersAmount);
 
         bdd.print2DUtil(bdd.root, 0);
-        System.out.println(bdd.use(bdd, "101"));
+        System.out.println(bdd.nodesAmount);
+        System.out.println(bdd.nodesReduced);
+        System.out.println(bdd.reductionRate());
+
+
+
+
+
+
+//
+//        ArrayList<Node> newNodeList = bdd.getNodesByDepth(bdd.root, 3);
+//        System.out.println(newNodeList.size());
+//        for(Node node : newNodeList) {
+//            System.out.println("Parent: " + node.parent.value + " Code: " + node.parent);
+//            System.out.println("Node: " + node.value + " Code: " + node);
+//            System.out.println("Zero: " + node.zero.value+ " Code: " + node.zero);
+//            System.out.println("One: " + node.one.value+ " Code: " + node.one);
+//            System.out.println("---");
+//        }
+//
+//        bdd.print2DUtil(bdd.root, 0);
+//        System.out.println(bdd.nodesAmount);
+//        bdd.printInorder(bdd.root);
+//        System.out.println("\n" + bdd.root.one.zero.zero.value);
+//        System.out.println("\n" + bdd.root.zero.one.zero.value);
+//        System.out.println("\n" + bdd.root.zero.one.zero.equals(bdd.root.one.zero.zero));
+
 
     }
 
