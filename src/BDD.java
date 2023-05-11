@@ -1,9 +1,8 @@
 import java.util.ArrayList;
-import java.util.Objects;
 
 public class BDD {
     Node root;
-    int valuesAmount = 0;
+    int amountOfVariables = 0;
     int nodesAmount = 0;
     int nodesReduced = 0;
     int layersAmount = 0;
@@ -12,14 +11,31 @@ public class BDD {
     String zeroPart;
     String onePart;
 
+    public BDD(Node root) {
+        this.root = root;
+    }
+
+    public BDD() {
+        this.root = new Node("");
+    }
 
     void bdd_create(String bFunction, String order) {
+
+        this.amountOfVariables = bFunction.split("\\+").length;
+
+        this.nodesAmount = 0;
+        this.nodesReduced = 0;
+        this.layersAmount = 0;
+
         order += " ";
         this.inputFunction = bFunction;
         this.inputOrder = order;
 
+        this.root = new Node("");
         this.root = bdd_create_rec(bFunction, order, 0, null);
         this.root.value = inputFunction;
+
+        reduce(this.layersAmount);
 
     }
 
@@ -40,7 +56,6 @@ public class BDD {
         newNode.zero = zeroNode;
         newNode.one = oneNode;
 
-
         newNode.zero = bdd_create_rec(newNode.zero.value, order, iteration+1, newNode);
 
         newNode.one = bdd_create_rec(newNode.one.value, order, iteration + 1, newNode);
@@ -51,43 +66,35 @@ public class BDD {
 
     }
 
+    // --- REDUCTION ---
     void reduce(int depth) {
 
-
-        // --- REDUCTION ---
-        for(int k = 1; k <= depth; k++) {
+        for (int k = 1; k <= depth; k++) {
             ArrayList<Node> nodesList = getNodesByDepth(this.root, k);
 
-            //      Type I reduction
+            // Type I reduction
             for (int i = 0; i < nodesList.size(); i++) {
-                if(nodesList.get(i).parent == null) continue;
-                for (int j = i+1; j < nodesList.size(); j++) {
-                    if (nodesList.get(i) == nodesList.get(j)) continue;
+                for (int j = i + 1; j < nodesList.size(); j++) {
+                    if (nodesList.get(i).equals(nodesList.get(j))) continue;
                     if (nodesList.get(i).value.equals(nodesList.get(j).value)) {
-
-                        System.out.println("Type I Reduction was made! ");
-
                         if (nodesList.get(j).parent.zero.value.equals(nodesList.get(j).value)) {
-
                             nodesList.get(j).parent.zero = nodesList.get(i);
-
+                            nodesList.set(j, nodesList.get(i));
+                            this.nodesReduced++;
                         } else if (nodesList.get(j).parent.one.value.equals(nodesList.get(j).value)) {
-//                            System.out.println("parent one was changed!");
                             nodesList.get(j).parent.one = nodesList.get(i);
-
+                            nodesList.set(j, nodesList.get(i));
+                            this.nodesReduced++;
                         }
-                        this.nodesReduced++;
                     }
                 }
             }
 
-            for(Node node : nodesList) {
-                //null checkers
-                if (node == null) return;
-//          Type S reduction
+            // Type S reduction
+            for (Node node : nodesList) {
                 if (node.zero == null || node.one == null) continue;
                 if (node.zero.value.equals(node.one.value)) {
-                    System.out.println("Type S reduction was made");
+                    if(node.parent == null || node.parent == this.root) continue;
                     if (node.parent.zero.value.equals(node.value)) {
                         node.parent.zero = node.zero;
                     } else {
@@ -97,7 +104,6 @@ public class BDD {
                 }
             }
         }
-
     }
 
     ArrayList<Node> getNodesByDepth(Node root, int depth) {
@@ -112,24 +118,6 @@ public class BDD {
         }
        return nodes;
     }
-
-    private ArrayList<Node> removedDuplicates(ArrayList<Node> nodes) {
-        ArrayList<Node> newNodes = new ArrayList<>();
-        for (Node thisNode : nodes) {
-            if (!newNodes.contains(thisNode)) newNodes.add(thisNode);
-        }
-        return newNodes;
-    }
-//    void reduce() {
-//
-//    }
-//    void reduceDuplicates() {
-//
-//    }
-//
-//    String use(String input) {
-//        return "0";
-//    }
 
     public void shannonDecomposition( String dnf, String var) {
 
@@ -194,7 +182,6 @@ public class BDD {
             zeroPart = zeroTerms.substring(0, zeroTerms.length() - 1);
             onePart = oneTerms.substring(0, oneTerms.length() - 1);
         }
-
     }
 
     public String use(BDD bdd, String value) {
@@ -216,82 +203,4 @@ public class BDD {
         float v = (float) nodesReduced / nodesAmount * 100.0f;
         return String.format("Reduction rate on this BDD: %.2f %%", v);
     }
-
-
-    void printInorder(Node node)
-    {
-        if (node == null)
-
-            return;
-
-        /* first recur on left child */
-        printInorder(node.zero);
-
-        /* then print the data of node */
-        System.out.print(node.value + " ");
-
-        /* now recur on right child */
-        printInorder(node.one);
-    }
-
-    void print2DUtil(Node root, int space)
-    {
-        // Base case
-        if (root == null)
-            return;
-
-        // Increase distance between levels
-        space += 20;
-
-        // Process right child first
-        print2DUtil(root.one, space);
-
-        // Print current node after space
-        // count
-        System.out.print("\n");
-        for (int i = 20; i < space; i++)
-            System.out.print(" ");
-        System.out.print(root.value + "\n");
-
-        // Process left child
-        print2DUtil(root.zero, space);
-    }
-
-    public static void main(String[] args) {
-        BDD bdd = new BDD();
-        bdd.bdd_create("AB+AC+BC", "ABC");
-
-        bdd.reduce(bdd.layersAmount);
-
-        bdd.print2DUtil(bdd.root, 0);
-        System.out.println(bdd.nodesAmount);
-        System.out.println(bdd.nodesReduced);
-        System.out.println(bdd.reductionRate());
-
-
-
-
-
-
-//
-//        ArrayList<Node> newNodeList = bdd.getNodesByDepth(bdd.root, 3);
-//        System.out.println(newNodeList.size());
-//        for(Node node : newNodeList) {
-//            System.out.println("Parent: " + node.parent.value + " Code: " + node.parent);
-//            System.out.println("Node: " + node.value + " Code: " + node);
-//            System.out.println("Zero: " + node.zero.value+ " Code: " + node.zero);
-//            System.out.println("One: " + node.one.value+ " Code: " + node.one);
-//            System.out.println("---");
-//        }
-//
-//        bdd.print2DUtil(bdd.root, 0);
-//        System.out.println(bdd.nodesAmount);
-//        bdd.printInorder(bdd.root);
-//        System.out.println("\n" + bdd.root.one.zero.zero.value);
-//        System.out.println("\n" + bdd.root.zero.one.zero.value);
-//        System.out.println("\n" + bdd.root.zero.one.zero.equals(bdd.root.one.zero.zero));
-
-
-    }
-
 }
